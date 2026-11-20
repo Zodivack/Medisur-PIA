@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+.env
+.env.*
+*.kubeconfig
+kubeconfig*
+k3s.yaml
+*.pem
+*.key
+.scannerwork/
