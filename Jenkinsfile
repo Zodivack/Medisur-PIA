@@ -252,6 +252,9 @@ pipeline {
                                     rollout status deployment/medisur-api \
                                     --timeout=180s
 
+                                echo "Esperando la propagacion de los endpoints..."
+                                sleep 5
+
                                 echo "Prueba de humo: /health"
 
                                 curl --fail --silent --show-error --max-time 10 \
@@ -268,18 +271,28 @@ pipeline {
 
                                 echo "Prueba de humo: /version"
 
-                                VERSION_JSON=$(curl --fail --silent --show-error \
-                                    --max-time 10 "$BASE_URL/version")
+                                VERSION_VERIFICADA=0
+                                INTENTO=1
+                                MAX_INTENTOS=12
 
-                                printf '%s\\n' "$VERSION_JSON"
+                                while [ "$INTENTO" -le "$MAX_INTENTOS" ] && [ "$VERSION_VERIFICADA" -eq 0 ]; do
 
-                                echo "Comparando version y SHA desplegados..."
+                                    echo "Verificando version: intento $INTENTO de $MAX_INTENTOS"
 
-                                printf '%s' "$VERSION_JSON" | python3 -c '
+                                    if VERSION_JSON=$(curl --fail --silent --show-error \
+                                        --max-time 10 "$BASE_URL/version"); then
+
+                                        printf '%s\\n' "$VERSION_JSON"
+
+                                        if printf '%s' "$VERSION_JSON" | python3 -c '
 import json
 import sys
 
-respuesta = json.load(sys.stdin)
+try:
+    respuesta = json.load(sys.stdin)
+except (json.JSONDecodeError, ValueError) as error:
+    print(f"Respuesta JSON invalida: {error}")
+    sys.exit(1)
 
 sha_esperado = sys.argv[1]
 version_esperada = sys.argv[2]
@@ -293,15 +306,40 @@ print(f"Version esperada: {version_esperada}")
 print(f"Version recibida: {version_obtenida}")
 
 if sha_obtenido != sha_esperado:
-    print("ERROR: El SHA desplegado no coincide.", file=sys.stderr)
+    print("La respuesta corresponde a otro commit.")
     sys.exit(1)
 
 if version_obtenida != version_esperada:
-    print("ERROR: La version desplegada no coincide.", file=sys.stderr)
+    print("La version recibida no coincide.")
     sys.exit(1)
 
 print("La version desplegada coincide con la imagen construida.")
-' "$GIT_SHA" "$APP_VERSION"
+' "$GIT_SHA" "$APP_VERSION"; then
+
+                                            VERSION_VERIFICADA=1
+
+                                        else
+                                            echo "La respuesta todavia no corresponde a la nueva version."
+                                        fi
+
+                                    else
+                                        echo "No se pudo consultar /version en este intento."
+                                    fi
+
+                                    if [ "$VERSION_VERIFICADA" -eq 0 ]; then
+                                        if [ "$INTENTO" -lt "$MAX_INTENTOS" ]; then
+                                            echo "Esperando 5 segundos antes de reintentar..."
+                                            sleep 5
+                                        fi
+
+                                        INTENTO=$((INTENTO + 1))
+                                    fi
+                                done
+
+                                if [ "$VERSION_VERIFICADA" -ne 1 ]; then
+                                    echo "ERROR: No se pudo confirmar la version y SHA desplegados."
+                                    exit 1
+                                fi
 
                                 echo "Pruebas de humo completadas correctamente."
                             '''
