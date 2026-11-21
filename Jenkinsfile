@@ -71,6 +71,37 @@ pipeline {
                 }
             }
         }
+
+        stage('Validar acceso a Kubernetes') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'kubeconfig-medisur',
+                        variable: 'KUBECONFIG_FILE'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        echo "Validando acceso al namespace medisur..."
+
+                        kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                            get deployments -n medisur
+
+                        echo "Verificando permiso para actualizar deployments..."
+
+                        PERMISO=$(kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                            auth can-i patch deployments -n medisur)
+
+                        echo "Permiso para actualizar deployments: $PERMISO"
+
+                        test "$PERMISO" = "yes"
+
+                        echo "Acceso a Kubernetes validado correctamente."
+                    '''
+                }
+            }
+        }
     }
 
     post {
