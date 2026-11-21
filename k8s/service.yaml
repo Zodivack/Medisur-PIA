@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: medisur-api
+  namespace: medisur
+  labels:
+    app.kubernetes.io/name: medisur-api
+    app.kubernetes.io/part-of: medisur
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: medisur-api
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http
