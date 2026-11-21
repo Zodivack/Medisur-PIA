@@ -46,7 +46,7 @@ spec:
       containers:
         - name: medisur-api
 
-          image: ghcr.io/zodivack/medisur-api:sha-pendiente
+          image: ghcr.io/zodivack/medisur-api:1.0.0-944e584
           imagePullPolicy: IfNotPresent
 
           ports:
