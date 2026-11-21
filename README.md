@@ -58,9 +58,9 @@ Instalar dependencias de desarrollo:
 | Variable | Valor predeterminado | Descripción |
 |---|---|---|
 | APP_NAME | devops-api | Nombre de la aplicación |
-| APP_VERSION | desconocida | Versión desplegada |
+| APP_VERSION | 1.0 | Versión desplegada |
 | GIT_SHA | desconocido | SHA del commit |
-| BUILD_DATE | desconocida | Fecha de construcción |
+| BUILD_DATE | 21-11-26 | Fecha de construcción |
 | LOG_LEVEL | INFO | Nivel de registro |
 | SEED_ITEMS | true | Cargar registros iniciales |
 | PORT | 8000 | Puerto de ejecución en Docker |
