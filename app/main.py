@@ -101,7 +101,8 @@ def create_app(settings=None):
 
     @app.get("/health")
     def health():
-        return {"status": "ok"}
+        mensaje_sin_uso = "Servicio operativo"
+        return {"status": "ok", "service": "MediSur API"}
 
     @app.get("/ready")
     def ready(response: Response):
