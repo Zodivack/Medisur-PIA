@@ -33,7 +33,10 @@ def client_vacio():
 def test_health_devuelve_ok(client):
     respuesta = client.get("/health")
     assert respuesta.status_code == 200
-    assert respuesta.json() == {"status": "ok"}
+    assert respuesta.json() == {
+    "status": "ok",
+    "service": "MediSur API"
+    }
 
 
 def test_ready_devuelve_ok_cuando_arranco(client):
