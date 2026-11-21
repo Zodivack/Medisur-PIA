@@ -25,14 +25,20 @@ pipeline {
                     docker run --rm \
                         --user "$(id -u):$(id -g)" \
                         --env HOME=/tmp \
-                        --volume "$WORKSPACE:/workspace" \
-                        --workdir /workspace \
+                        --volume "$WORKSPACE:$WORKSPACE" \
+                        --workdir "$WORKSPACE" \
                         python:3.12-slim \
                         sh -c '
                             python -m venv /tmp/venv &&
                             /tmp/venv/bin/python -m pip install --no-cache-dir -r requirements-dev.txt &&
                             /tmp/venv/bin/python -m pytest --junitxml=reports/pytest.xml
                         '
+
+                    test -s coverage.xml
+                    test -s reports/pytest.xml
+
+                    echo "Origenes del informe de cobertura:"
+                    sed -n "/<sources>/,/<\\/sources>/p" coverage.xml
                 '''
             }
 
