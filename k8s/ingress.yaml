@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: medisur-api
+  namespace: medisur
+  labels:
+    app.kubernetes.io/name: medisur-api
+    app.kubernetes.io/part-of: medisur
+
+spec:
+  ingressClassName: traefik
+
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: medisur-api
+                port:
+                  number: 80

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: medisur-config
+  namespace: medisur
+data:
+  APP_NAME: "MediSur API"
+  LOG_LEVEL: "INFO"
+  SEED_ITEMS: "true"
+  PORT: "8000"

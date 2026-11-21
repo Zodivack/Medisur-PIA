@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medisur-api
+  namespace: medisur
+  labels:
+    app.kubernetes.io/name: medisur-api
+    app.kubernetes.io/part-of: medisur
+spec:
+  replicas: 2
+
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 180
+  minReadySeconds: 3
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: medisur-api
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: medisur-api
+        app.kubernetes.io/part-of: medisur
+
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 20
+
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: medisur-api
+
+          image: ghcr.io/zodivack/medisur-api:sha-pendiente
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: medisur-config
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+            successThreshold: 1
