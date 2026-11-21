@@ -212,6 +212,150 @@ pipeline {
                 }
             }
         }
+
+        stage('Despliegue y pruebas de humo en Kubernetes') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'kubeconfig-medisur',
+                        variable: 'KUBECONFIG_FILE'
+                    )
+                ]) {
+                    script {
+                        def actualizacionAplicada = false
+
+                        try {
+                            sh '''
+                                set -eu
+
+                                echo "Actualizando la imagen del Deployment..."
+
+                                kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                                    --namespace=medisur \
+                                    set image deployment/medisur-api \
+                                    medisur-api="$IMAGE_NAME:$IMAGE_TAG_VERSION"
+
+                                echo "Imagen actualizada correctamente."
+                            '''
+
+                            actualizacionAplicada = true
+
+                            sh '''
+                                set -eu
+
+                                BASE_URL="http://10.0.1.5"
+
+                                echo "Esperando que termine el rollout..."
+
+                                kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                                    --namespace=medisur \
+                                    rollout status deployment/medisur-api \
+                                    --timeout=180s
+
+                                echo "Prueba de humo: /health"
+
+                                curl --fail --silent --show-error --max-time 10 \
+                                    "$BASE_URL/health"
+
+                                echo
+
+                                echo "Prueba de humo: /ready"
+
+                                curl --fail --silent --show-error --max-time 10 \
+                                    "$BASE_URL/ready"
+
+                                echo
+
+                                echo "Prueba de humo: /version"
+
+                                VERSION_JSON=$(curl --fail --silent --show-error \
+                                    --max-time 10 "$BASE_URL/version")
+
+                                printf '%s\\n' "$VERSION_JSON"
+
+                                echo "Comparando version y SHA desplegados..."
+
+                                printf '%s' "$VERSION_JSON" | python3 -c '
+import json
+import sys
+
+respuesta = json.load(sys.stdin)
+
+sha_esperado = sys.argv[1]
+version_esperada = sys.argv[2]
+
+sha_obtenido = respuesta.get("commit")
+version_obtenida = respuesta.get("version")
+
+print(f"SHA esperado: {sha_esperado}")
+print(f"SHA recibido: {sha_obtenido}")
+print(f"Version esperada: {version_esperada}")
+print(f"Version recibida: {version_obtenida}")
+
+if sha_obtenido != sha_esperado:
+    print("ERROR: El SHA desplegado no coincide.", file=sys.stderr)
+    sys.exit(1)
+
+if version_obtenida != version_esperada:
+    print("ERROR: La version desplegada no coincide.", file=sys.stderr)
+    sys.exit(1)
+
+print("La version desplegada coincide con la imagen construida.")
+' "$GIT_SHA" "$APP_VERSION"
+
+                                echo "Pruebas de humo completadas correctamente."
+                            '''
+
+                        } catch (Exception error) {
+
+                            if (actualizacionAplicada) {
+                                echo "ERROR: fallo el despliegue o una prueba de humo."
+                                echo "Intentando restaurar la revision anterior..."
+
+                                def resultadoRollback = sh(
+                                    returnStatus: true,
+                                    script: '''
+                                        set -eu
+
+                                        echo "Ejecutando kubectl rollout undo..."
+
+                                        kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                                            --namespace=medisur \
+                                            rollout undo deployment/medisur-api
+
+                                        echo "Esperando la recuperacion de la revision anterior..."
+
+                                        kubectl --kubeconfig="$KUBECONFIG_FILE" \
+                                            --namespace=medisur \
+                                            rollout status deployment/medisur-api \
+                                            --timeout=180s
+
+                                        echo "Version restaurada:"
+
+                                        curl --fail --silent --show-error \
+                                            --max-time 10 http://10.0.1.5/version
+
+                                        echo
+                                    '''
+                                )
+
+                                if (resultadoRollback == 0) {
+                                    echo "Rollback completado correctamente."
+                                } else {
+                                    echo "ERROR: no se pudo confirmar el rollback. Codigo: ${resultadoRollback}"
+                                }
+
+                            } else {
+                                echo "La actualizacion del Deployment no se completo correctamente."
+                                echo "No se ejecuta rollback porque no se confirmo un cambio de imagen."
+                            }
+
+                            throw error
+                        }
+                    }
+                }
+            }
+        }
     }
 
     post {
